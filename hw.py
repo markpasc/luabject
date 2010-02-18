@@ -30,6 +30,10 @@ class Null(object):
         pass
 
 
+class TargetError(Exception):
+    pass
+
+
 class Thing(object):
 
     def __init__(self, parent):
@@ -63,6 +67,29 @@ class Thing(object):
     def hear(self, message):
         for child in iter(self.contents):
             child.hear(message)
+
+    def find_inside(self, target):
+        items = [child for child in iter(self.contents)
+            if target in child.name]
+        if not items:
+            raise TargetError('No such contents %r' % target)
+        if len(items) == 1:
+            return items[0]
+        return items
+
+    def find(self, target):
+        norm_target = target.strip().lower()
+        if norm_target == 'me':
+            return self
+        if norm_target == 'here':
+            return self.parent
+
+        try:
+            return self.find_inside(target)
+        except TargetError:
+            pass
+
+        return self.parent.find_inside(target)
 
 
 class Avatar(Thing):
@@ -108,6 +135,15 @@ class Avatar(Thing):
 
     def do_name(self, name):
         self.name = name
+
+    def do_look(self, *args):
+        if args:
+            target = ' '.join(args)
+        else:
+            target = 'here'
+
+        target_obj = self.find(target)
+        self.write(target_obj.description)
 
     def write(self, line, *args):
         if args:
