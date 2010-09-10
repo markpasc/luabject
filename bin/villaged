@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+import sys
+
+import village.server
+
+
+sys.exit(village.server.main(sys.argv[1:]))
