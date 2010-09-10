@@ -150,6 +150,12 @@ class Avatar(Thing):
         target_obj = self.find(target)
         self.write(target_obj.description)
 
+    def do_set(self, target, property, value):
+        target_obj = self.find(target)
+        # TODO: confirm that the actor has permissions on that obj
+        setattr(target_obj, property, value)
+        self.write('Set.')
+
     def write(self, line, *args):
         if args:
             line = line % args
