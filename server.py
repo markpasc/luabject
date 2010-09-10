@@ -8,6 +8,8 @@ from eventlet import api
 
 class Message(object):
 
+    """A message "spoken" by a Thing for other Things to "hear"."""
+
     def __init__(self, speaker, text):
         assert isinstance(speaker, Thing)
         assert text is not None
@@ -16,6 +18,8 @@ class Message(object):
 
 
 class Null(object):
+
+    """Stub replacement for a Thing that doesn't exist."""
 
     def __new__(cls):
         try:
@@ -32,6 +36,10 @@ class Null(object):
 
 
 class TargetError(Exception):
+
+    """Error thrown when an object cannot be found using the `Thing.find()`
+    method."""
+
     pass
 
 
@@ -52,8 +60,16 @@ class Thing(object):
         self.__dict__['name'] = value
 
     name = property(_get_name, _set_name)
+    """The human readable name for this Thing, by which it can be found in its
+    environment."""
 
     def add(self, obj):
+        """Adds `obj` to this Thing's contents.
+
+        When added to this Thing, `obj` is removed from its existing parent,
+        if it has one.
+
+        """
         self.contents.add(obj)
         parent = getattr(obj, 'parent', None)
         obj.parent = self
@@ -61,15 +77,30 @@ class Thing(object):
             parent.remove(obj)
 
     def remove(self, obj):
+        """Removes `obj` from this Thing's contents.
+
+        The `obj` Thing is not reparented anywhere. Making it continue to be
+        available in the object hierarchy is up to you.
+
+        """
         if obj.parent is self:
             return
         self.contents.remove(obj)
 
     def hear(self, message):
+        """Gives this Thing the Message `message` to "hear."
+
+        In this implementation, the message is repropagated to all this
+        Thing's contents (so a Thing's contents all "hear" a message the Thing
+        "hears").
+
+        """
         for child in iter(self.contents):
             child.hear(message)
 
     def find_inside(self, target):
+        """Returns the item or a list of items in this Thing's contents the
+        names of which contain the string `target`."""
         items = [child for child in iter(self.contents)
             if target in child.name]
         if not items:
@@ -79,6 +110,15 @@ class Thing(object):
         return items
 
     def find(self, target):
+        """Returns the item or list of items somewhere around this Thing the
+        names of which contain the string `target`.
+
+        Matching items this Thing contains are returned first; if none match,
+        matching sibling Things inside this Thing's parent are returned (if
+        any). If `target` is either of the special strings `"me"` or `"here"`,
+        this Thing itself or its parent respectively are returned.
+
+        """
         norm_target = target.strip().lower()
         if norm_target == 'me':
             return self
@@ -95,6 +135,9 @@ class Thing(object):
 
 class Avatar(Thing):
 
+    """A Thing with a network connection to an external animating construct
+    (such as a real human player)."""
+
     def __init__(self, conn, parent):
         super(Avatar, self).__init__(parent)
 
@@ -103,6 +146,12 @@ class Avatar(Thing):
         self.reader = conn.makefile('r')
 
     def hear(self, message):
+        """Gives this Avatar the Message `message` to "hear."
+
+        This implementation prints the message to the remote user over the
+        wire.
+
+        """
         super(Avatar, self).hear(message)
         self.write('%s says, "%s"', message.speaker.name, message.text)
 
@@ -110,6 +159,7 @@ class Avatar(Thing):
         self.write("Oops, no such command %r.", cmd)
 
     def operate(self):
+        """Serve the player's input line by line until they disconnect."""
         line = self.reader.readline()
         while line:
             lineparts = line.strip().split(None, 1)
@@ -137,13 +187,19 @@ class Avatar(Thing):
             line = self.reader.readline()
 
     def do_say(self, text):
+        """Send the player's message to other objects in its parent when the
+        player uses the "say" command."""
         m = Message(self, text)
         self.parent.hear(m)
 
     def do_name(self, name):
+        """Change this Avatar's name when the player uses the "name"
+        command."""
         self.name = name
 
     def do_look(self, target=None):
+        """Show the player the target object's `description` attribute when
+        the player uses the "look" command."""
         if target is None:
             target = 'here'
 
@@ -151,12 +207,19 @@ class Avatar(Thing):
         self.write(target_obj.description)
 
     def do_set(self, target, property, value):
+        """Set the target object's property `property` to the value `value`
+        when the player uses the "set" command."""
         target_obj = self.find(target)
         # TODO: confirm that the actor has permissions on that obj
         setattr(target_obj, property, value)
         self.write('Set.')
 
     def write(self, line, *args):
+        """Print `line` to the player.
+
+        Extra arguments, if provided, are formatted into `line` first.
+
+        """
         if args:
             line = line % args
         wr = self.writer
@@ -166,6 +229,8 @@ class Avatar(Thing):
 
 
 class Server(object):
+
+    """A world server hosting a hierarchy and a set of connections."""
 
     def __init__(self):
         self.room = Thing(Null())
