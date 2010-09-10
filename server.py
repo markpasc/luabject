@@ -1,4 +1,5 @@
 import functools
+import inspect
 import logging
 import sys
 
@@ -111,35 +112,39 @@ class Avatar(Thing):
     def operate(self):
         line = self.reader.readline()
         while line:
-            args = line.strip().split()
-            cmd = args.pop(0)
+            lineparts = line.strip().split(None, 1)
+            cmd = lineparts.pop(0)
 
             try:
                 handler = getattr(self, 'do_' + cmd)
             except AttributeError:
-                handler = functools.partial(self.unknown_command, cmd)
+                self.unknown_command(cmd)
+            else:
+                # Resplit according to how many args there are.
+                funcargs, varargs, varkw, defaults = inspect.getargspec(handler)
+                logging.debug('Handler %r takes %d args %r', handler, len(funcargs), funcargs)
+                args = line.strip().split(None, len(funcargs) - 1)  # ignore self
+                args.pop(0)  # ignore cmd
 
-            try:
-                handler(*args)
-            except Exception, exc:
-                exc_type = type(exc).__name__
-                self.write("Oops, %s: %s.", exc_type, str(exc))
-                logging.error('Oops, %s handling command %r', exc_type, line)
-                logging.exception(exc)
+                try:
+                    handler(*args)
+                except Exception, exc:
+                    exc_type = type(exc).__name__
+                    self.write("Oops, %s: %s.", exc_type, str(exc))
+                    logging.error('Oops, %s handling command %r', exc_type, line)
+                    logging.exception(exc)
 
             line = self.reader.readline()
 
-    def do_say(self, *args):
-        m = Message(self, ' '.join(args))
+    def do_say(self, text):
+        m = Message(self, text)
         self.parent.hear(m)
 
     def do_name(self, name):
         self.name = name
 
-    def do_look(self, *args):
-        if args:
-            target = ' '.join(args)
-        else:
+    def do_look(self, target=None):
+        if target is None:
             target = 'here'
 
         target_obj = self.find(target)
