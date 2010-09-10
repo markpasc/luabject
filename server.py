@@ -220,6 +220,76 @@ class Avatar(Thing):
         setattr(target_obj, property, value)
         self.write('Set.')
 
+    def do_make(self, name):
+        th = Thing(self)
+        th.name = name
+        self.write('Created %s.', name)
+
+    def do_inventory(self):
+        if not self.contents:
+            self.write("You aren't carrying anything.")
+            return
+
+        self.write('You are carrying: %s', ', '.join(thing.name for thing in self.contents))
+
+    def do_give(self, thingname, targetname):
+        try:
+            thing = self.find_inside(thingname)
+        except TargetError:
+            self.write("You aren't carrying a %r.", thingname)
+            return
+        if isinstance(thing, list):
+            self.write("Which %r? %s?", thingname, ' or '.join(th.name for th in thing))
+            return
+
+        try:
+            target = self.find(targetname)
+            if isinstance(target, list):
+                target = [t for t in target if isinstance(t, Avatar)]
+                if not target:
+                    raise TargetError()
+                if len(target) > 1:
+                    self.write("Which %r? %s?", targetname, ' or '.join(t.name for t in target))
+                    return
+                target = target[0]
+            if not isinstance(target, Avatar):
+                raise TargetError()
+        except TargetError:
+            self.write("There isn't a %r here.", targetname)
+            return
+
+        target.add(thing)
+        self.write('You give your %s to %s.', thing.name, target.name)
+        target.write('%s gives their %s to you.', self.name, thing.name)
+
+    def do_drop(self, name):
+        try:
+            thing = self.find_inside(name)
+        except TargetError:
+            self.write("You aren't carrying a %r.", name)
+            return
+
+        if isinstance(thing, list):
+            self.write("Which %r? %s?", name, ' or '.join(t.name for t in thing))
+            return
+
+        self.parent.add(thing)
+        self.write('You drop your %s.', thing.name)
+
+    def do_take(self, name):
+        try:
+            thing = self.parent.find_inside(name)
+        except TargetError:
+            self.write("There isn't a %r here to take.", name)
+            return
+
+        if isinstance(thing, list):
+            self.write("Which %r? %s?", name, ' or '.join(t.name for t in thing))
+            return
+
+        self.add(thing)
+        self.write('You take the %s.', thing.name)
+
     def write(self, line, *args):
         """Print `line` to the player.
 
