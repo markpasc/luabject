@@ -59,7 +59,13 @@ class Thing(object):
     def _set_name(self, value):
         self.__dict__['name'] = value
 
-    name = property(_get_name, _set_name)
+    def _del_name(self):
+        try:
+            del self.__dict__['name']
+        except KeyError:
+            pass
+
+    name = property(_get_name, _set_name, _del_name)
     """The human readable name for this Thing, by which it can be found in its
     environment."""
 
