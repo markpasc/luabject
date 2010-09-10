@@ -3,7 +3,7 @@ import inspect
 import logging
 import sys
 
-from eventlet import api
+import eventlet
 
 
 class Message(object):
@@ -312,13 +312,13 @@ class Server(object):
         self.room = Thing(Null())
 
     def host(self):
-        server = api.tcp_listener(('0.0.0.0', 3000))
+        server = eventlet.listen(('0.0.0.0', 3000))
         while True:
             logging.info('Waiting for connection')
             conn, addr = server.accept()
             logging.info('Somebody from %r connected', addr)
 
-            api.spawn(Avatar(conn, self.room).operate)
+            eventlet.spawn(Avatar(conn, self.room).operate)
 
 
 def main(argv=None):
