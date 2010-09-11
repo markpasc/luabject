@@ -27,6 +27,13 @@ extern "C" {
         return Py_BuildValue("O", capsule);
     }
 
+    static PyObject* raise_lua_error(PyObject* errortype, lua_State* L) {
+        int top = lua_gettop(L);
+        assert(lua_isstring(L, top));
+        PyErr_SetString(errortype, lua_tostring(L, top));
+        return NULL;
+    }
+
     static PyObject* load_script(PyObject* self, PyObject* args) {
         PyObject* capsule;
         char* script;
@@ -36,17 +43,12 @@ extern "C" {
         lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
 
         int status = luaL_loadstring(L, script);
-        if (status) {
-            // FIXME: Actually surface the real Lua error here.
-            PyErr_SetString(PyExc_ValueError, "Error while loading the script");
-            return NULL;
-        }
+        if (status)
+            return raise_lua_error(PyExc_ValueError, L);
+
         status = lua_pcall(L, 0, 0, 0);
-        if (status) {
-            // FIXME: Actually surface the real Lua error here.
-            PyErr_SetString(PyExc_ValueError, "Error while running the script");
-            return NULL;
-        }
+        if (status)
+            return raise_lua_error(PyExc_ValueError, L);
 
         // TODO: Lock the global table after the initial run
         // so it can't be mutated by others.
