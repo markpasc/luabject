@@ -43,3 +43,23 @@ class TestDirect(unittest.TestCase):
 
         # Can load a syntactically correct script even after a load_script() exception.
         _luabject.load_script(state, "function foo() prant() end")
+
+    def test_start_function(self):
+        # Trying to start an unknown function raises an exception.
+        state = _luabject.new()
+        _luabject.load_script(state, "bar = 1")
+        with self.assertRaises(ValueError):
+            _luabject.start_function(state, "foo")
+        with self.assertRaises(ValueError):
+            _luabject.start_function(state, "bar")
+
+        # Errors in the script are raised as exceptions when run.
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() prant() end")
+        with self.assertRaises(_luabject.LuaRuntimeError):
+            _luabject.start_function(state, "foo")
+
+        # Otherwise a script will run just fine.
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() bar = 1 end")
+        _luabject.start_function(state, "foo")

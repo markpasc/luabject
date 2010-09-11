@@ -59,9 +59,34 @@ extern "C" {
         Py_RETURN_NONE;
     }
 
+    static PyObject* start_function(PyObject* self, PyObject* args) {
+        PyObject* capsule;
+        char* funcname;
+
+        if (!PyArg_ParseTuple(args, "Os", &capsule, &funcname))
+            return NULL;
+        lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
+
+        lua_State* thread = lua_newthread(L);
+
+        lua_getglobal(thread, funcname);
+        if (!lua_isfunction(thread, lua_gettop(thread))) {
+            lua_pop(L, 1);
+            PyErr_SetString(PyExc_ValueError, "Uh that function you asked for is not a function");
+            return NULL;
+        }
+        // TODO: resume instead of pcall
+        int status = lua_pcall(thread, 0, 0, 0);
+        if (status)
+            return raise_lua_error(status, thread);
+
+        Py_RETURN_NONE;
+    }
+
     static PyMethodDef LuabjectMethods[] = {
         {"new", new_luabject, METH_VARARGS, "Create a new Luabject with a stack and everything."},
         {"load_script", load_script, METH_VARARGS, "Load a script into a Luabject."},
+        {"start_function", start_function, METH_VARARGS, "Call one of the Luabject's functions."},
         {NULL, NULL, 0, NULL}  // sentinel
     };
 
