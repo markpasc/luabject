@@ -7,6 +7,11 @@ extern "C" {
     #include "lua.h"
     #include "lauxlib.h"
 
+    static void close_lua_state(void* state) {
+        lua_State* L = (lua_State*) state;
+        lua_close(L);
+    }
+
     static PyObject* new_luabject(PyObject* self, PyObject* args) {
         PyObject* capsule;
         lua_State* L;
@@ -18,7 +23,7 @@ extern "C" {
         //luaL_openlibs(state);  // TODO: sandbox
 
         // Return the state out to Python land.
-        capsule = PyCObject_FromVoidPtr((void*) L, NULL);
+        capsule = PyCObject_FromVoidPtr((void*) L, close_lua_state);
         return Py_BuildValue("O", capsule);
     }
 
@@ -28,23 +33,21 @@ extern "C" {
 
         if (!PyArg_ParseTuple(args, "Os", &capsule, &script))
             return NULL;
-
         lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
 
         int status = luaL_loadstring(L, script);
         if (status) {
             // FIXME: Actually surface the real Lua error here.
-            PyErr_SetString(PyExc_RuntimeError, "Error while loading the script");
-            lua_close(L);
+            PyErr_SetString(PyExc_ValueError, "Error while loading the script");
             return NULL;
         }
         status = lua_pcall(L, 0, 0, 0);
         if (status) {
             // FIXME: Actually surface the real Lua error here.
-            PyErr_SetString(PyExc_RuntimeError, "Error while running the script");
-            lua_close(L);
+            PyErr_SetString(PyExc_ValueError, "Error while running the script");
             return NULL;
         }
+
         // TODO: Lock the global table after the initial run
         // so it can't be mutated by others.
 
