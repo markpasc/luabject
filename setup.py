@@ -5,7 +5,7 @@ from distutils.core import setup, Extension
 
 luabject = Extension('village._luabject',
                      libraries=['lua'],
-                     sources=['src/luabject.c'])
+                     sources=['src/luabject.cpp'])
 
 setup(
     name='village',
