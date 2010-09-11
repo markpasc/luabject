@@ -5,6 +5,10 @@ import sys
 
 import argparse
 import eventlet
+from pymongo import Connection
+
+
+log = logging.getLogger(__name__)
 
 
 class Message(object):
@@ -69,6 +73,19 @@ class Thing(object):
     name = property(_get_name, _set_name, _del_name)
     """The human readable name for this Thing, by which it can be found in its
     environment."""
+
+    def as_dict(self):
+        data = dict()
+        for k, v in self.__dict__.items():
+            if isinstance(v, Thing):
+                if not hasattr(v, '_id'):
+                    raise ValueError("Cannot serialize %r to dictionary with an unsaved %r in its %r attribute"
+                        % (self, v, k))
+                data[k] = v._id
+            else:
+                data[k] = v
+        del data['contents']
+        return data
 
     def add(self, obj):
         """Adds `obj` to this Thing's contents.
@@ -151,6 +168,13 @@ class Avatar(Thing):
         self.conn = conn
         self.writer = conn.makefile('w')
         self.reader = conn.makefile('r')
+
+    def as_dict(self):
+        data = super(Avatar, self).as_dict()
+        del data['conn']
+        del data['writer']
+        del data['reader']
+        return data
 
     def hear(self, message):
         """Gives this Avatar the Message `message` to "hear."
@@ -312,39 +336,123 @@ class Server(object):
 
     """A world server hosting a hierarchy and a set of connections."""
 
-    def __init__(self):
-        self.room = Thing(Null())
+    def __init__(self, dburi):
+        conn = Connection(dburi) if dburi is not None else Connection()
+        self.db = conn.village
+
+    def create_world(self):
+        self.db.objects.drop()
+
+        self.root = Thing(Null())
+        self.root.name = 'Here'
+        self.root._is_root = True
+
+        self.save_world()
+        log.info('Saved new empty database')
+
+    def load_world(self):
+        log.info('Loading database')
+
+        all_objs = dict()
+        for obj in self.db.objects.find():
+            thing = all_objs.get(obj['_id'], Thing(Null()))
+            thing.__dict__.update(obj)
+
+            all_objs[thing._id] = thing
+
+            try:
+                parent = thing.parent
+            except AttributeError:
+                self.root = thing
+            else:
+                if parent not in all_objs:
+                    all_objs[parent] = Thing(Null())
+                parentobj = all_objs[parent]
+                thing.parent = parentobj
+                parentobj.contents.add(thing)
+
+        assert hasattr(self, 'root')
+        log.info('Loaded database')
+
+    def save_world(self):
+        log.info('Saving database')
+
+        def nextthing(thing):
+            things = [thing]
+            to_ask = []
+
+            while things:
+                for thing in things:
+                    to_ask.append(thing)
+                    yield thing
+                things = []
+                while to_ask and not things:
+                    next_ask = to_ask.pop(0)
+                    try:
+                        childs = next_ask.contents
+                    except AttributeError:
+                        pass
+                    else:
+                        things = childs
+
+        for thing in nextthing(self.root):
+            log.debug('Inserting obj %r with _id %s', thing, getattr(thing, '_id', None))
+            thingid = self.db.objects.insert(thing.as_dict())
+            thing._id = thingid
+
+        log.info('Database saved')
 
     def host(self):
+        log.info('Starting to serve')
+
         server = eventlet.listen(('0.0.0.0', 3000))
         while True:
             logging.info('Waiting for connection')
             conn, addr = server.accept()
             logging.info('Somebody from %r connected', addr)
 
-            eventlet.spawn(Avatar(conn, self.room).operate)
+            eventlet.spawn(Avatar(conn, self.root).operate)
 
 
 def main(argv):
     parser = argparse.ArgumentParser(description="Runs a village world server")
     parser.add_argument('-v', dest='verbosity', action='append_const', const=1,
-        help='Be more verbose (stackable)', default=[2])
+        help='Be more verbose (stackable)', default=[3])
     parser.add_argument('-q', dest='verbosity', action='append_const', const=-1,
         help='Be less verbose (stackable)')
+
+    parser.add_argument('--db', metavar='URI',
+        help='The hostname and/or port where the database server is listening')
+
+    parser.add_argument('--createdb', action='store_true',
+        help='Create a database instead of starting up')
 
     args = parser.parse_args(argv)
 
     verbosity = sum(args.verbosity)
     verbosity = 0 if verbosity < 0 else verbosity if verbosity < 4 else 4
     log_level = [logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][verbosity]
-    logging.basicConfig(level=log_level)
-    logging.getLogger().setLevel(log_level)
-    logging.info('Set log level to %s', logging.getLevelName(log_level))
+    logging.basicConfig(level=log_level,
+        format='%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S')
 
+    if args.db is not None and not args.db.startswith('mongodb://'):
+        args.db = 'mongodb://%s' % args.db
+    log.debug('Expecting database at %s', args.db)
+
+    serv = Server(args.db)
+
+    if args.createdb:
+        serv.create_world()
+        return 0
+
+    serv.load_world()
     try:
-        Server().host()
+        serv.host()
     except KeyboardInterrupt:
-        logging.info('Terminating')
+        print
+        serv.save_world()
+        log.info('Terminating')
 
     return 0
 
