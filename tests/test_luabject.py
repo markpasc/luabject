@@ -53,13 +53,49 @@ class TestDirect(unittest.TestCase):
         with self.assertRaises(ValueError):
             _luabject.start_function(state, "bar")
 
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() bar = 1 end")
+        thread = _luabject.start_function(state, "foo")
+        self.assertEqual(0, _luabject.thread_status(thread))
+
+        # Functions that throw runtime errors can still be started without error.
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() prant() end")
+        thread = _luabject.start_function(state, "foo")
+        self.assertEqual(0, _luabject.thread_status(thread))
+
+    def test_pump_thread(self):
         # Errors in the script are raised as exceptions when run.
         state = _luabject.new()
         _luabject.load_script(state, "function foo() prant() end")
+        thread = _luabject.start_function(state, "foo")
         with self.assertRaises(_luabject.LuaRuntimeError):
-            _luabject.start_function(state, "foo")
+            _luabject.pump_thread(thread)
 
-        # Otherwise a script will run just fine.
+        # A short error-free script runs to completion.
         state = _luabject.new()
         _luabject.load_script(state, "function foo() bar = 1 end")
-        _luabject.start_function(state, "foo")
+        thread = _luabject.start_function(state, "foo")
+        self.assertEqual(0, _luabject.thread_status(thread))
+        _luabject.pump_thread(thread)
+        self.assertEqual(0, _luabject.thread_status(thread))
+
+        # A long error-free script will take more than one pump to run.
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() for v = 1, 10000 do bar = 1 end end")
+        thread = _luabject.start_function(state, "foo")
+        self.assertEqual(0, _luabject.thread_status(thread))
+        _luabject.pump_thread(thread)
+        self.assertEqual(1, _luabject.thread_status(thread))
+        _luabject.pump_thread(thread)
+        self.assertEqual(1, _luabject.thread_status(thread))
+
+        # An infinite loop can be pumped without raising an exception.
+        state = _luabject.new()
+        _luabject.load_script(state, "function foo() while true do bar = 1 end end")
+        thread = _luabject.start_function(state, "foo")
+        self.assertEqual(0, _luabject.thread_status(thread))
+        _luabject.pump_thread(thread)
+        self.assertEqual(1, _luabject.thread_status(thread))
+        _luabject.pump_thread(thread)
+        self.assertEqual(1, _luabject.thread_status(thread))

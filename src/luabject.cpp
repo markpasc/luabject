@@ -48,6 +48,7 @@ extern "C" {
         if (status)
             return raise_lua_error(status, L);
 
+        // TODO: even this script load is potentially unsafe, so it should be run as a pumped thread too.
         status = lua_pcall(L, 0, 0, 0);
         if (status)
             return raise_lua_error(status, L);
@@ -59,6 +60,10 @@ extern "C" {
         Py_RETURN_NONE;
     }
 
+    static void end_thread_step(lua_State* l, lua_Debug* ar) {
+        lua_yield(l, 0);
+    }
+
     static PyObject* start_function(PyObject* self, PyObject* args) {
         PyObject* capsule;
         char* funcname;
@@ -68,6 +73,7 @@ extern "C" {
         lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
 
         lua_State* thread = lua_newthread(L);
+        lua_sethook(thread, end_thread_step, LUA_MASKCOUNT, 10);
 
         lua_getglobal(thread, funcname);
         if (!lua_isfunction(thread, lua_gettop(thread))) {
@@ -75,18 +81,42 @@ extern "C" {
             PyErr_SetString(PyExc_ValueError, "Uh that function you asked for is not a function");
             return NULL;
         }
-        // TODO: resume instead of pcall
-        int status = lua_pcall(thread, 0, 0, 0);
-        if (status)
+
+        PyObject* threadcapsule = PyCObject_FromVoidPtr((void*) thread, NULL);
+        return Py_BuildValue("O", threadcapsule);
+    }
+
+    static PyObject* thread_status(PyObject* self, PyObject* args) {
+        PyObject* capsule;
+
+        if (!PyArg_ParseTuple(args, "O", &capsule))
+            return NULL;
+        lua_State* thread = (lua_State*) PyCObject_AsVoidPtr(capsule);
+
+        int status = lua_status(thread);
+        return Py_BuildValue("i", status);
+    }
+
+    static PyObject* pump_thread(PyObject* self, PyObject* args) {
+        PyObject* capsule;
+
+        if (!PyArg_ParseTuple(args, "O", &capsule))
+            return NULL;
+        lua_State* thread = (lua_State*) PyCObject_AsVoidPtr(capsule);
+
+        int status = lua_resume(thread, 0);
+        if (status && status != LUA_YIELD)
             return raise_lua_error(status, thread);
 
-        Py_RETURN_NONE;
+        return Py_BuildValue("i", status);
     }
 
     static PyMethodDef LuabjectMethods[] = {
         {"new", new_luabject, METH_VARARGS, "Create a new Luabject with a stack and everything."},
         {"load_script", load_script, METH_VARARGS, "Load a script into a Luabject."},
         {"start_function", start_function, METH_VARARGS, "Call one of the Luabject's functions."},
+        {"thread_status", thread_status, METH_VARARGS, "Query the status of a Luabject thread."},
+        {"pump_thread", pump_thread, METH_VARARGS, "Resume the thread for one Luabject execution step."},
         {NULL, NULL, 0, NULL}  // sentinel
     };
 
