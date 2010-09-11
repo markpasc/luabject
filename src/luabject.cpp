@@ -9,14 +9,31 @@ extern "C" {
 
     static PyObject* new_luabject(PyObject* self, PyObject* args) {
         PyObject* capsule;
-        lua_State* state;
+        lua_State* L;
 
-        char * script;
+        char* script;
 
-        if (!PyArg_ParseTuple(args, ""))
+        if (!PyArg_ParseTuple(args, "s", &script))
             return NULL;
 
-        state = luaL_newstate();  // TODO: should there already be a lua state to fork from?
+        L = luaL_newstate();  // TODO: should there already be a lua state to fork from?
+        int status = luaL_loadstring(L, script);
+        if (status) {
+            // FIXME: Actually surface the real Lua error here.
+            PyErr_SetString(PyExc_RuntimeError, "Error while loading the script");
+            lua_close(L);
+            return NULL;
+        }
+        status = lua_pcall(L, 0, 0, 0);
+        if (status) {
+            // FIXME: Actually surface the real Lua error here.
+            PyErr_SetString(PyExc_RuntimeError, "Error while running the script");
+            lua_close(L);
+            return NULL;
+        }
+        // TODO: Lock the global table after the initial run
+        // so it can't be mutated by others.
+
         //luaL_openlibs(state);  // TODO: sandbox
         //lua_sethook(state, carp, LUA_MASKCOUNT, 10);  // TODO: should we set up stoppage here, or does it need to happen somewhere the thread can be continued?
 
