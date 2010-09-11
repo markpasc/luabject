@@ -15,11 +15,10 @@ extern "C" {
             return NULL;
 
         L = luaL_newstate();  // TODO: should there already be a lua state to fork from?
-        printf("%p\n", L);
         //luaL_openlibs(state);  // TODO: sandbox
 
         // Return the state out to Python land.
-        capsule = PyCObject_FromVoidPtr((void*) capsule, NULL);
+        capsule = PyCObject_FromVoidPtr((void*) L, NULL);
         return Py_BuildValue("O", capsule);
     }
 
@@ -31,10 +30,8 @@ extern "C" {
             return NULL;
 
         lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
-        printf("%p from %p\n", L, capsule);
 
         int status = luaL_loadstring(L, script);
-        Py_RETURN_NONE;
         if (status) {
             // FIXME: Actually surface the real Lua error here.
             PyErr_SetString(PyExc_RuntimeError, "Error while loading the script");
