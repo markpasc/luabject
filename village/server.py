@@ -211,6 +211,9 @@ class Avatar(Thing):
             target = 'here'
 
         target_obj = self.find(target)
+        if isinstance(target_obj, list):
+            self.write('Which %r? %s?', target, ' or '.join(thing.name for thing in target_obj))
+            return
         self.write(target_obj.description)
 
     def do_set(self, target, property, value):
