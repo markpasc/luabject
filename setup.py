@@ -13,4 +13,5 @@ setup(
     packages=['village'],
     scripts=['bin/villaged'],
     ext_modules=[luabject],
+    requires=['greenlet', 'eventlet', 'argparse'],
 )

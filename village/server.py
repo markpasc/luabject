@@ -3,6 +3,7 @@ import inspect
 import logging
 import sys
 
+import argparse
 import eventlet
 
 
@@ -321,8 +322,21 @@ class Server(object):
             eventlet.spawn(Avatar(conn, self.room).operate)
 
 
-def main(argv=None):
-    logging.basicConfig(level=logging.DEBUG)
+def main(argv):
+    parser = argparse.ArgumentParser(description="Runs a village world server")
+    parser.add_argument('-v', dest='verbosity', action='append_const', const=1,
+        help='Be more verbose (stackable)', default=[2])
+    parser.add_argument('-q', dest='verbosity', action='append_const', const=-1,
+        help='Be less verbose (stackable)')
+
+    args = parser.parse_args(argv)
+
+    verbosity = sum(args.verbosity)
+    verbosity = 0 if verbosity < 0 else verbosity if verbosity < 4 else 4
+    log_level = [logging.CRITICAL, logging.ERROR, logging.WARNING, logging.INFO, logging.DEBUG][verbosity]
+    logging.basicConfig(level=log_level)
+    logging.getLogger().setLevel(log_level)
+    logging.info('Set log level to %s', logging.getLevelName(log_level))
 
     try:
         Server().host()
@@ -333,4 +347,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
