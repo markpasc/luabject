@@ -33,5 +33,13 @@ class TestDirect(unittest.TestCase):
         with self.assertRaises(ValueError):
             _luabject.load_script(state, "1+1")
 
-        # Can load a syntactically correct script even after loading an incorrect script raises an exception.
+        # Can load a syntactically correct script even after a load_script() exception.
+        _luabject.load_script(state, "function foo() prant() end")
+
+        # Loading a syntactically correct script that causes an error raises an exception.
+        state = _luabject.new()
+        with self.assertRaises(ValueError):
+            _luabject.load_script(state, "hi()")
+
+        # Can load a syntactically correct script even after a load_script() exception.
         _luabject.load_script(state, "function foo() prant() end")
