@@ -42,16 +42,18 @@ extern "C" {
 
         if (!PyArg_ParseTuple(args, "Os", &capsule, &script))
             return NULL;
-        lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
+        lua_State* thread = (lua_State*) PyCObject_AsVoidPtr(capsule);
 
-        int status = luaL_loadstring(L, script);
+        int status = luaL_loadstring(thread, script);
         if (status)
-            return raise_lua_error(status, L);
+            return raise_lua_error(status, thread);
 
         // TODO: even this script load is potentially unsafe, so it should be run as a pumped thread too.
+        /*
         status = lua_pcall(L, 0, 0, 0);
         if (status)
             return raise_lua_error(status, L);
+        */
 
         // TODO: Lock the global table after the initial run
         // so it can't be mutated by others.
@@ -64,26 +66,36 @@ extern "C" {
         lua_yield(l, 0);
     }
 
-    static PyObject* start_function(PyObject* self, PyObject* args) {
+    static PyObject* new_thread(PyObject* self, PyObject* args) {
         PyObject* capsule;
-        char* funcname;
 
-        if (!PyArg_ParseTuple(args, "Os", &capsule, &funcname))
+        if (!PyArg_ParseTuple(args, "O", &capsule))
             return NULL;
         lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
 
         lua_State* thread = lua_newthread(L);
         lua_sethook(thread, end_thread_step, LUA_MASKCOUNT, 10);
 
+        PyObject* threadcapsule = PyCObject_FromVoidPtr((void*) thread, NULL);
+        return Py_BuildValue("O", threadcapsule);
+    }
+
+    static PyObject* load_function(PyObject* self, PyObject* args) {
+        PyObject* capsule;
+        char* funcname;
+
+        if (!PyArg_ParseTuple(args, "Os", &capsule, &funcname))
+            return NULL;
+        lua_State* thread = (lua_State*) PyCObject_AsVoidPtr(capsule);
+
         lua_getglobal(thread, funcname);
         if (!lua_isfunction(thread, lua_gettop(thread))) {
-            lua_pop(L, 1);
+            lua_pop(thread, 1);
             PyErr_SetString(PyExc_ValueError, "Uh that function you asked for is not a function");
             return NULL;
         }
 
-        PyObject* threadcapsule = PyCObject_FromVoidPtr((void*) thread, NULL);
-        return Py_BuildValue("O", threadcapsule);
+        Py_RETURN_NONE;
     }
 
     static PyObject* thread_status(PyObject* self, PyObject* args) {
@@ -114,7 +126,8 @@ extern "C" {
     static PyMethodDef LuabjectMethods[] = {
         {"new", new_luabject, METH_VARARGS, "Create a new Luabject with a stack and everything."},
         {"load_script", load_script, METH_VARARGS, "Load a script into a Luabject."},
-        {"start_function", start_function, METH_VARARGS, "Call one of the Luabject's functions."},
+        {"new_thread", new_thread, METH_VARARGS, "Create a new thread for the Luabject."},
+        {"load_function", load_function, METH_VARARGS, "Prepare to call one of the Luabject's functions."},
         {"thread_status", thread_status, METH_VARARGS, "Query the status of a Luabject thread."},
         {"pump_thread", pump_thread, METH_VARARGS, "Resume the thread for one Luabject execution step."},
         {NULL, NULL, 0, NULL}  // sentinel
