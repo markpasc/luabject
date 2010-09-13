@@ -48,17 +48,9 @@ extern "C" {
         if (status)
             return raise_lua_error(status, thread);
 
-        // TODO: even this script load is potentially unsafe, so it should be run as a pumped thread too.
-        /*
-        status = lua_pcall(L, 0, 0, 0);
-        if (status)
-            return raise_lua_error(status, L);
-        */
-
         // TODO: Lock the global table after the initial run
         // so it can't be mutated by others.
 
-        //lua_sethook(state, carp, LUA_MASKCOUNT, 10);  // TODO: should we set up stoppage here, or does it need to happen somewhere the thread can be continued?
         Py_RETURN_NONE;
     }
 
