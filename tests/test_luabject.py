@@ -131,3 +131,21 @@ class TestPyject(unittest.TestCase):
         l = luabject.Luabject()
         l.load_script("function foo() bar = 1 end")
         l.run('foo')
+
+    def test_cooperative(self):
+        l = luabject.Luabject()
+        l.load_script("function foo() for x = 1, 20 do bar = 1 end end")
+
+        luab_thread = eventlet.spawn(l.run, 'foo')
+        other_thread = eventlet.spawn(lambda: None)
+
+        results = list()
+        def linked_append(gt, arg):
+            results.append(arg)
+
+        other_thread.link(linked_append, 'other')
+        luab_thread.link(linked_append, 'luab')
+
+        # The other thread finishes before the luabject thread, even though the luabject thread starts first.
+        luab_thread.wait()
+        self.assertEqual(['other', 'luab'], results)
