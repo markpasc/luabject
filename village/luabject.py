@@ -1,13 +1,27 @@
-import village._luabject
+import eventlet
+
+from village import _luabject
 
 
 class Luabject(object):
 
     def __init__(self):
-        self._state = village._luabject.new_luabject()
+        self._state = _luabject.new()
 
-    def start(self, funcname, args, callback=None):
-        village._luabject.start(self._state, funcname, *args)
+    def load_script(self, script):
+        thread = _luabject.new_thread(self._state)
+        _luabject.load_script(thread, script)
+        _luabject.pump_thread(thread)
+        while _luabject.thread_status(thread) == 1:
+            eventlet.sleep()
+            _luabject.pump_thread(thread)
 
-    def pump(self):
-        village._luabject.pump(self._state)
+    def run(self, funcname, args=None, kwargs=None):
+        thread = _luabject.new_thread(self._state)
+        _luabject.load_function(thread, funcname)
+        # TODO: put args on the stack after the function
+        # TODO: do the first pump with the number of args too
+        _luabject.pump_thread(thread)
+        while _luabject.thread_status(thread) == 1:
+            eventlet.sleep()
+            _luabject.pump_thread(thread)

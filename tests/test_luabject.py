@@ -4,7 +4,10 @@ except ImportError:
     import unittest
 
 
+import eventlet
+
 from village import _luabject
+from village import luabject
 
 
 class TestDirect(unittest.TestCase):
@@ -120,3 +123,11 @@ class TestDirect(unittest.TestCase):
         self.assertEqual(1, _luabject.thread_status(thread))
         _luabject.pump_thread(thread)
         self.assertEqual(1, _luabject.thread_status(thread))
+
+
+class TestPyject(unittest.TestCase):
+
+    def test_basic(self):
+        l = luabject.Luabject()
+        l.load_script("function foo() bar = 1 end")
+        l.run('foo')
