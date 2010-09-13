@@ -122,7 +122,7 @@ extern "C" {
         {"load_function", load_function, METH_VARARGS, "Prepare to call one of the Luabject's functions."},
         {"thread_status", thread_status, METH_VARARGS, "Query the status of a Luabject thread."},
         {"pump_thread", pump_thread, METH_VARARGS, "Resume the thread for one Luabject execution step."},
-        {NULL, NULL, 0, NULL}  // sentinel
+        {NULL, NULL, 0, NULL}
     };
 
     PyMODINIT_FUNC init_luabject(void) {
