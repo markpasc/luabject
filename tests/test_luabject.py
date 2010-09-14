@@ -170,3 +170,25 @@ class TestPyject(unittest.TestCase):
         # The other thread finishes before the luabject thread, even though the luabject thread starts first.
         luab_thread.wait()
         self.assertEqual(['other', 'luab'], results)
+
+    def test_call(self):
+        class Test(object):
+            def __init__(self):
+                self.is_run = False
+            def __call__(self):
+                self.is_run = True
+
+        tester = Test()
+
+        def test_call(tester):
+            l = luabject.Luabject()
+            l.register_global("say", tester)
+            def moose(l):
+                l.load_script("function touched() say() end")
+                l.run("touched")
+            gt = eventlet.spawn(moose, l)
+            gt.wait()
+            self.assertTrue(tester.is_run)
+
+        pool = eventlet.GreenPool()
+        pool.spawn_n(test_call, tester)
