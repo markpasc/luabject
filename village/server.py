@@ -7,6 +7,8 @@ import argparse
 import eventlet
 from pymongo import Connection
 
+from village.luabject import Luabject
+
 
 log = logging.getLogger(__name__)
 
@@ -74,6 +76,26 @@ class Thing(object):
     """The human readable name for this Thing, by which it can be found in its
     environment."""
 
+    def _get_luacode(self):
+        return self.__dict__['luacode']
+
+    def _set_luacode(self, value):
+        self.__dict__['luacode'] = value
+
+        def say():
+            m = Message(self, 'HI!')
+            self.parent.hear(m)
+
+        self.lua = Luabject()
+        self.lua.register_global('say', say)
+        self.lua.load_script(value)
+
+    def _del_luacode(self):
+        del self.__dict__['luacode']
+        del self.lua
+
+    luacode = property(_get_luacode, _set_luacode, _del_luacode)
+
     def as_dict(self):
         data = dict()
         for k, v in self.__dict__.items():
@@ -121,6 +143,14 @@ class Thing(object):
         """
         for child in iter(self.contents):
             child.hear(message)
+
+    def touched(self, toucher):
+        try:
+            lua = self.lua
+        except AttributeError:
+            pass
+        else:
+            self.lua.run('touched')
 
     def find_inside(self, target):
         """Returns the item or a list of items in this Thing's contents the
@@ -317,6 +347,19 @@ class Avatar(Thing):
 
         self.add(thing)
         self.write('You take the %s.', thing.name)
+
+    def do_touch(self, name):
+        try:
+            thing = self.parent.find_inside(name)
+        except TargetError:
+            self.write("There isn't a %r here to take.", name)
+            return
+
+        if isinstance(thing, list):
+            self.write("Which %r? %s?", name, ' or '.join(t.name for t in thing))
+            return
+
+        thing.touched(self)
 
     def write(self, line, *args):
         """Print `line` to the player.

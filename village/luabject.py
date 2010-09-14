@@ -16,6 +16,9 @@ class Luabject(object):
             eventlet.sleep()
             _luabject.pump_thread(thread)
 
+    def register_global(self, name, fn):
+        _luabject.register_global(self._state, name, fn)
+
     def run(self, funcname, args=None, kwargs=None):
         thread = _luabject.new_thread(self._state)
         _luabject.load_function(thread, funcname)
