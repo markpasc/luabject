@@ -124,6 +124,27 @@ class TestDirect(unittest.TestCase):
         _luabject.pump_thread(thread)
         self.assertEqual(1, _luabject.thread_status(thread))
 
+    def test_register_global(self):
+        state = _luabject.new()
+
+        class Test(object):
+            def __init__(self):
+                self.ran = False
+            def __call__(self):
+                self.ran = True
+
+        tester = Test()
+        _luabject.register_global(state, "hi", tester)
+
+        self.load_script_to_completion(state, "function foo() hi() end")
+        thread = _luabject.new_thread(state)
+        _luabject.load_function(thread, "foo")
+        _luabject.pump_thread(thread)
+        while 1 == _luabject.thread_status(thread):
+            _luabject.pump_thread(thread)
+
+        self.assertTrue(tester.ran)
+
 
 class TestPyject(unittest.TestCase):
 

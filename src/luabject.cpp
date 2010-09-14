@@ -29,6 +29,35 @@ extern "C" {
         return Py_BuildValue("O", capsule);
     }
 
+    int invoke_python_callable(lua_State* L) {
+        PyObject* callable = (PyObject*) lua_touserdata(L, lua_upvalueindex(1));
+        assert(PyCallable_Check(callable));
+
+        // TODO: Convert the stacked args to py args.
+
+        PyObject* ret = PyObject_CallObject(callable, NULL);
+
+        // TODO: Convert the return value to stacked return values.
+
+        return 0;
+    }
+
+    static PyObject* register_global(PyObject* self, PyObject* args) {
+        PyObject* capsule;
+        char* name;
+        PyObject* callable;
+
+        if (!PyArg_ParseTuple(args, "OsO", &capsule, &name, &callable))
+            return NULL;
+        lua_State* L = (lua_State*) PyCObject_AsVoidPtr(capsule);
+
+        lua_pushlightuserdata(L, (void*) callable);
+        lua_pushcclosure(L, invoke_python_callable, 1);
+        lua_setglobal(L, name);
+
+        Py_RETURN_NONE;
+    }
+
     static PyObject* raise_lua_error(int status, lua_State* L) {
         int top = lua_gettop(L);
         assert(lua_isstring(L, top));
@@ -117,6 +146,7 @@ extern "C" {
 
     static PyMethodDef LuabjectMethods[] = {
         {"new", new_luabject, METH_VARARGS, "Create a new Luabject with a stack and everything."},
+        {"register_global", register_global, METH_VARARGS, "Register a Python callable as a global function in the Luabject."},
         {"load_script", load_script, METH_VARARGS, "Load a script into a Luabject."},
         {"new_thread", new_thread, METH_VARARGS, "Create a new thread for the Luabject."},
         {"load_function", load_function, METH_VARARGS, "Prepare to call one of the Luabject's functions."},
