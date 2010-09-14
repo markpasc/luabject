@@ -35,6 +35,7 @@ extern "C" {
 
         // TODO: Convert the stacked args to py args.
 
+        // TODO: Why does this segfault on bound instance methods?
         PyObject* ret = PyObject_CallObject(callable, NULL);
 
         // TODO: Convert the return value to stacked return values.
