@@ -21,7 +21,7 @@ class TestDirect(unittest.TestCase):
         thread = _luabject.new_thread(state)
         _luabject.load_script(thread, script)
         _luabject.pump_thread(thread)
-        while _luabject.thread_status(thread) == 1:
+        while _luabject.LUA_YIELD == _luabject.thread_status(thread):
             _luabject.pump_thread(thread)
 
     def test_load_script(self):
@@ -54,7 +54,7 @@ class TestDirect(unittest.TestCase):
         _luabject.load_script(thread, "hi()")
         with self.assertRaises(_luabject.LuaRuntimeError):
             _luabject.pump_thread(thread)
-            while _luabject.thread_status(thread) == 1:
+            while _luabject.LUA_YIELD == _luabject.thread_status(thread):
                 _luabject.pump_thread(thread)
 
         # Can load a syntactically correct script even after a load_script() exception.
@@ -109,9 +109,9 @@ class TestDirect(unittest.TestCase):
         _luabject.load_function(thread, "foo")
         self.assertEqual(0, _luabject.thread_status(thread))
         _luabject.pump_thread(thread)
-        self.assertEqual(1, _luabject.thread_status(thread))
+        self.assertEqual(_luabject.LUA_YIELD, _luabject.thread_status(thread))
         _luabject.pump_thread(thread)
-        self.assertEqual(1, _luabject.thread_status(thread))
+        self.assertEqual(_luabject.LUA_YIELD, _luabject.thread_status(thread))
 
         # An infinite loop can be pumped without raising an exception.
         state = _luabject.new()
@@ -120,9 +120,9 @@ class TestDirect(unittest.TestCase):
         _luabject.load_function(thread, "foo")
         self.assertEqual(0, _luabject.thread_status(thread))
         _luabject.pump_thread(thread)
-        self.assertEqual(1, _luabject.thread_status(thread))
+        self.assertEqual(_luabject.LUA_YIELD, _luabject.thread_status(thread))
         _luabject.pump_thread(thread)
-        self.assertEqual(1, _luabject.thread_status(thread))
+        self.assertEqual(_luabject.LUA_YIELD, _luabject.thread_status(thread))
 
     def test_register_global(self):
         state = _luabject.new()
@@ -140,7 +140,7 @@ class TestDirect(unittest.TestCase):
         thread = _luabject.new_thread(state)
         _luabject.load_function(thread, "foo")
         _luabject.pump_thread(thread)
-        while 1 == _luabject.thread_status(thread):
+        while _luabject.LUA_YIELD == _luabject.thread_status(thread):
             _luabject.pump_thread(thread)
 
         self.assertTrue(tester.ran)

@@ -178,6 +178,11 @@ extern "C" {
         PyExc_LuaErrors[LUA_ERRERR] = PyErr_NewException("village._luabject.LuaErrorError", NULL, NULL);
         Py_INCREF(PyExc_LuaErrors[LUA_ERRRUN]);
         PyModule_AddObject(m, "LuaErrorError", PyExc_LuaErrors[LUA_ERRRUN]);
+
+        PyModule_AddIntConstant(m, "LUA_YIELD", LUA_YIELD);
+        PyModule_AddIntConstant(m, "LUA_ERRSYNTAX", LUA_ERRSYNTAX);
+        PyModule_AddIntConstant(m, "LUA_ERRMEM", LUA_ERRMEM);
+        PyModule_AddIntConstant(m, "LUA_ERRRUN", LUA_ERRRUN);
     }
 
 }
