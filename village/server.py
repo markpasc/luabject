@@ -1,11 +1,12 @@
 import functools
 import inspect
+import json
 import logging
+import os
 import sys
 
 import argparse
 import eventlet
-from pymongo import Connection
 
 from village.luabject import Luabject
 
@@ -97,16 +98,13 @@ class Thing(object):
     luacode = property(_get_luacode, _set_luacode, _del_luacode)
 
     def as_dict(self):
-        data = dict()
-        for k, v in self.__dict__.items():
-            if isinstance(v, Thing):
-                if not hasattr(v, '_id'):
-                    raise ValueError("Cannot serialize %r to dictionary with an unsaved %r in its %r attribute"
-                        % (self, v, k))
-                data[k] = v._id
-            else:
-                data[k] = v
-        del data['contents']
+        data = dict((k, v) for k, v in self.__dict__.items() if not k.startswith('_'))
+        # Also not parent.
+        try:
+            del data['parent']
+        except KeyError:
+            pass
+        data['_thing'] = True
         return data
 
     def add(self, obj):
@@ -379,69 +377,54 @@ class Server(object):
 
     """A world server hosting a hierarchy and a set of connections."""
 
-    def __init__(self, dburi):
-        conn = Connection(dburi) if dburi is not None else Connection()
-        self.db = conn.village
+    def __init__(self, dbfilename):
+        self.dbfilename = dbfilename
 
     def create_world(self):
-        self.db.objects.drop()
-
+        # Make a new empty world and save it.
         self.root = Thing(Null())
         self.root.name = 'Here'
-        self.root._is_root = True
 
         self.save_world()
         log.info('Saved new empty database')
 
+    def world_decoder(self, data):
+        if '_thing' in data:
+            th = Thing(Null())
+            th.__dict__.update(data)
+            th.contents = set(th.contents)
+            return th
+        return data
+
     def load_world(self):
         log.info('Loading database')
 
-        all_objs = dict()
-        for obj in self.db.objects.find():
-            thing = all_objs.get(obj['_id'], Thing(Null()))
-            thing.__dict__.update(obj)
-
-            all_objs[thing._id] = thing
-
-            try:
-                parent = thing.parent
-            except AttributeError:
-                self.root = thing
-            else:
-                if parent not in all_objs:
-                    all_objs[parent] = Thing(Null())
-                parentobj = all_objs[parent]
-                thing.parent = parentobj
-                parentobj.contents.add(thing)
+        db = open(self.dbfilename, 'r')
+        self.root = json.load(db, object_hook=self.world_decoder)
+        db.close()
 
         assert hasattr(self, 'root')
         log.info('Loaded database')
 
+    class WorldEncoder(json.JSONEncoder):
+
+        def default(self, o):
+            if isinstance(o, set):
+                return list(iter(o))
+            if isinstance(o, Thing):
+                return o.as_dict()
+            return super(Server.WorldEncoder, self).default(o)
+
     def save_world(self):
         log.info('Saving database')
 
-        def nextthing(thing):
-            things = [thing]
-            to_ask = []
+        newfilename = self.dbfilename + '.new'
+        db = open(newfilename, 'w')
 
-            while things:
-                for thing in things:
-                    to_ask.append(thing)
-                    yield thing
-                things = []
-                while to_ask and not things:
-                    next_ask = to_ask.pop(0)
-                    try:
-                        childs = next_ask.contents
-                    except AttributeError:
-                        pass
-                    else:
-                        things = childs
+        json.dump(self.root, db, cls=self.WorldEncoder)
 
-        for thing in nextthing(self.root):
-            log.debug('Inserting obj %r with _id %s', thing, getattr(thing, '_id', None))
-            thingid = self.db.objects.insert(thing.as_dict())
-            thing._id = thingid
+        db.close()
+        os.rename(newfilename, self.dbfilename)
 
         log.info('Database saved')
 
@@ -464,9 +447,8 @@ def main(argv):
     parser.add_argument('-q', dest='verbosity', action='append_const', const=-1,
         help='Be less verbose (stackable)')
 
-    parser.add_argument('--db', metavar='URI',
-        help='The hostname and/or port where the database server is listening')
-
+    parser.add_argument('--db', metavar='FILE', default='village.json',
+        help='The name of the file where the database is/should be')
     parser.add_argument('--createdb', action='store_true',
         help='Create a database instead of starting up')
 
@@ -479,8 +461,6 @@ def main(argv):
         format='%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S')
 
-    if args.db is not None and not args.db.startswith('mongodb://'):
-        args.db = 'mongodb://%s' % args.db
     log.debug('Expecting database at %s', args.db)
 
     serv = Server(args.db)
