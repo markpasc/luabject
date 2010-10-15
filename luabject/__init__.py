@@ -1,6 +1,6 @@
 import eventlet
 
-from village import _luabject
+from luabject import _luabject
 
 
 class Luabject(object):

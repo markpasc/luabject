@@ -3,15 +3,14 @@
 from distutils.core import setup, Extension
 
 
-luabject = Extension('village._luabject',
+luabject = Extension('luabject._luabject',
                      libraries=['lua'],
                      sources=['src/luabject.cpp'])
 
 setup(
-    name='village',
+    name='luabject',
     version='1.0',
-    packages=['village'],
-    scripts=['bin/villaged'],
+    packages=['luabject'],
     ext_modules=[luabject],
-    requires=['greenlet', 'eventlet', 'argparse'],
+    requires=['greenlet', 'eventlet'],
 )

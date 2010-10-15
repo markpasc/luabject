@@ -6,8 +6,8 @@ except ImportError:
 
 import eventlet
 
-from village import _luabject
-from village import luabject
+from luabject import _luabject
+import luabject
 
 
 class TestDirect(unittest.TestCase):

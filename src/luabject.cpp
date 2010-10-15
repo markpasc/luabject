@@ -159,23 +159,23 @@ extern "C" {
     PyMODINIT_FUNC init_luabject(void) {
         PyObject* m;
 
-        m = Py_InitModule("village._luabject", LuabjectMethods);
+        m = Py_InitModule("luabject._luabject", LuabjectMethods);
         if (m == NULL)
             return;
 
-        PyExc_LuaErrors[LUA_ERRRUN] = PyErr_NewException("village._luabject.LuaRuntimeError", NULL, NULL);
+        PyExc_LuaErrors[LUA_ERRRUN] = PyErr_NewException("luabject._luabject.LuaRuntimeError", NULL, NULL);
         Py_INCREF(PyExc_LuaErrors[LUA_ERRRUN]);
         PyModule_AddObject(m, "LuaRuntimeError", PyExc_LuaErrors[LUA_ERRRUN]);
 
-        PyExc_LuaErrors[LUA_ERRSYNTAX] = PyErr_NewException("village._luabject.LuaSyntaxError", NULL, NULL);
+        PyExc_LuaErrors[LUA_ERRSYNTAX] = PyErr_NewException("luabject._luabject.LuaSyntaxError", NULL, NULL);
         Py_INCREF(PyExc_LuaErrors[LUA_ERRSYNTAX]);
         PyModule_AddObject(m, "LuaSyntaxError", PyExc_LuaErrors[LUA_ERRSYNTAX]);
 
-        PyExc_LuaErrors[LUA_ERRMEM] = PyErr_NewException("village._luabject.LuaMemoryError", NULL, NULL);
+        PyExc_LuaErrors[LUA_ERRMEM] = PyErr_NewException("luabject._luabject.LuaMemoryError", NULL, NULL);
         Py_INCREF(PyExc_LuaErrors[LUA_ERRMEM]);
         PyModule_AddObject(m, "LuaMemoryError", PyExc_LuaErrors[LUA_ERRMEM]);
 
-        PyExc_LuaErrors[LUA_ERRERR] = PyErr_NewException("village._luabject.LuaErrorError", NULL, NULL);
+        PyExc_LuaErrors[LUA_ERRERR] = PyErr_NewException("luabject._luabject.LuaErrorError", NULL, NULL);
         Py_INCREF(PyExc_LuaErrors[LUA_ERRRUN]);
         PyModule_AddObject(m, "LuaErrorError", PyExc_LuaErrors[LUA_ERRRUN]);
 
