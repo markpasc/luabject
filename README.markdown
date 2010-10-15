@@ -1,3 +1,3 @@
-# village
+# luabject
 
-Village is a virtual world server using coroutinous networking and Lua softcode.
+Luabject is an experiment in scheduling interruptable Lua softcode from within Python programs.
